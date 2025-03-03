@@ -1,56 +1,61 @@
 <script lang="ts">
-	import otherImage from '$lib/assets/100_1_small.png';
-	import otherImage2 from '$lib/assets/test2.jpeg';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import CheckeredCanvas from '$lib/components/checkered-canvas/CheckeredCanvas.svelte';
+	import ExampleImageSelector from '$lib/components/example-image-selector/ExampleImageSelector.svelte';
 	import HiddenCanvas from '$lib/components/hidden-canvas/HiddenCanvas.svelte';
 	import ImageCanvas from '$lib/components/image-canvas/ImageCanvas.svelte';
 	import LineDrawer from '$lib/components/line-drawer/LineDrawer.svelte';
 	import SettingsView from '$lib/components/settings-view';
 	import { Button } from '$lib/components/ui/button';
 	import DragDrop from '$lib/components/ux/drag-drop/drag-drop.svelte';
+	import ExampleImages from '$lib/example-images';
 	import Image2 from '$lib/model/image';
 	import type Line from '$lib/model/line';
+	import {
+		sendPosthogPageLeaveEvent,
+		sendPosthogPageViewEvent,
+		sendRemoveBackgroundEvent
+	} from '$lib/posthog';
+	import edgeDetection from '$lib/remove-background/edge-detection';
 	import removeSolidColor from '$lib/remove-background/remove-solid-color';
 	import { Settings } from '$lib/settings.svelte';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
 	//TODO: If we determine that the background is solid color-ish then we can simply remove that from the image edges untill we reach an object
 	//TODO: How do we remove the background for more complicated images?
 
-	console.log(otherImage, otherImage2);
-
-	let settings: Settings | null = $state(null);
-	onMount(() => {
-		settings = Settings.instance;
-	});
-	let imageCanvas: ImageCanvas;
-	let droppedImage: string | null = $state(otherImage);
-	let htmlImage: HTMLImageElement | null = $state(null);
-	let image2: Image2 | null = $state(null);
-	let threshold = 0.2;
 	let container: any;
-	let lines: Array<Line> = [];
 	let imageWidth = $state(0);
 	let imageHeight = $state(0);
+	let lines: Array<Line> = [];
+	let imageCanvas: ImageCanvas;
+	let image2: Image2 | null = $state(null);
+	let settings: Settings | null = $state(null);
+	let droppedImage: string | null = $state(null);
+	let htmlImage: HTMLImageElement | null = $state(null);
+
+	onMount(() => {
+		settings = Settings.instance;
+        droppedImage = ExampleImages.instance.selectImage(settings.lastExampleImage);
+        settings.lastExampleImage += 1;
+		sendPosthogPageViewEvent($page.url.href);
+
+		onDestroy(() => {
+			if (browser) {
+				console.log('Destryo');
+				sendPosthogPageLeaveEvent($page.url.href);
+			}
+		});
+	});
 
 	$effect(() => {
-		console.log('This too?');
 		if (droppedImage) {
 			setup();
 		}
 	});
 
-	/*
-	$effect(() => {
-		if (image2) {
-            console.log("From here?");
-			removeBackground();
-		}
-	});
-    */
-
 	function setup() {
-        console.log("Setup");
 		let image = new Image();
 		image.src = droppedImage!;
 		image.onload = function () {
@@ -58,8 +63,6 @@
 
 			imageWidth = width;
 			imageHeight = height;
-
-			console.log('W, H: ', imageWidth, imageHeight);
 
 			container.style.width = width + 2 + 'px';
 			container.style.height = height + 2 + 'px';
@@ -85,20 +88,19 @@
 	}
 
 	function reset() {
-        console.log("Reset");
 		setup();
 	}
 
 	function removeBackground() {
-		console.log('Remove background');
+		sendRemoveBackgroundEvent();
 		if (!image2) {
 			return;
 		}
-		removeSolidColor(image2);
+        edgeDetection(image2);
+		//removeSolidColor(image2, settings?.singleColorThreshold ?? 0);
 		imageCanvas.update();
 		if (settings?.autoDownload) {
-			console.log('Download');
-			//download();
+			download();
 		}
 	}
 
@@ -111,19 +113,32 @@
 	function download() {
 		imageCanvas.download();
 	}
+
+	function selectExampleImage(image: string) {
+		droppedImage = image;
+		reset();
+	}
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<SettingsView {settings}></SettingsView>
+<div>
+	<h1>Welcome to SvelteKit</h1>
+	<SettingsView {settings}></SettingsView>
+</div>
 
-<Button onclick={reset}>Reset</Button>
-<Button onclick={download}>Download</Button>
+<div>
+	<Button onclick={reset}>Reset</Button>
+	<Button onclick={download}>Download</Button>
+</div>
+
+<div>
+	<ExampleImageSelector onSelect={selectExampleImage}></ExampleImageSelector>
+</div>
 
 <DragDrop bind:droppedImage></DragDrop>
 
 <div class="relative border-[1px] border-black" bind:this={container}>
 	<CheckeredCanvas {imageWidth} {imageHeight}></CheckeredCanvas>
-	<LineDrawer {imageWidth} {imageHeight} {threshold}></LineDrawer>
+	<LineDrawer {imageWidth} {imageHeight} threshold={settings?.singleColorThreshold}></LineDrawer>
 	<ImageCanvas
 		bind:this={imageCanvas}
 		bind:image2

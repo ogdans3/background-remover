@@ -1,7 +1,11 @@
+import ExampleImages from "./example-images";
+
 export class Settings {
     autoDownload: boolean = $state(false);
     removeSolidColor: boolean = $state(true);
     removeBackgroundOnLoad: boolean = $state(true);
+    singleColorThreshold: number = 0.05;
+    lastExampleImage: number = 0;
 
     private cookieName = "settings";
     private daysCookieIsKept = 365;
@@ -9,14 +13,18 @@ export class Settings {
     static _instance: Settings;
 
     private constructor() {
+        this.setSettings();
         this.getSettings();
         //TODO: This is probably ugly?
         $effect(() => {
-            this.stateUpdated([this.autoDownload, this.removeSolidColor, this.removeBackgroundOnLoad])
+            this.stateUpdated([this.autoDownload, this.removeSolidColor, this.removeBackgroundOnLoad, this.singleColorThreshold, this.lastExampleImage])
         });
     }
 
     private stateUpdated(throwAwayObject: any) {
+        if (this.lastExampleImage >= ExampleImages.instance.length) {
+            this.lastExampleImage = 0;
+        }
         this.setSettings();
     }
 
@@ -50,6 +58,8 @@ export class Settings {
         this.autoDownload = settings.autoDownload ?? this.autoDownload;
         this.removeSolidColor = settings.removeSolidColor ?? this.removeSolidColor;
         this.removeBackgroundOnLoad = settings.removeBackgroundOnLoad ?? this.removeBackgroundOnLoad;
+        this.singleColorThreshold = settings.singleColorThreshold ?? this.singleColorThreshold;
+        this.lastExampleImage = settings.lastExampleImage ?? this.lastExampleImage;
     }
 
     private getJSON() {
@@ -57,6 +67,8 @@ export class Settings {
             autoDownload: this.autoDownload,
             removeSolidColor: this.removeSolidColor,
             removeBackgroundOnLoad: this.removeBackgroundOnLoad,
+            singleColorThreshold: this.singleColorThreshold,
+            lastExampleImage: this.lastExampleImage,
         };
     }
 

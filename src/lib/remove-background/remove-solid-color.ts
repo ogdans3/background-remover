@@ -3,7 +3,7 @@ import type { Pixel } from "$lib/model/pixel";
 import type { RGBA } from "$lib/model/rgba";
 import { colorDifference } from "$lib/util";
 
-export default function removeSolidColor(image: Image2) {
+export function findColor(edgePixels: Pixel[]) {
     // Count occurrences of edge colors
     let colorCount = new Map<string, number>();
 
@@ -15,6 +15,19 @@ export default function removeSolidColor(image: Image2) {
         return str.split(',').map(Number) as RGBA;
     }
 
+    // Count color occurrences
+    for (let pixel of edgePixels) {
+        let colorStr = rgbaToString(pixel.rgba);
+        colorCount.set(colorStr, (colorCount.get(colorStr) || 0) + 1);
+    }
+
+    // Find the most common edge color
+    let mostCommonColorStr = [...colorCount.entries()].reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+    let mostCommonColor = stringToRgba(mostCommonColorStr);
+    return mostCommonColor;
+}
+
+export default function removeSolidColor(image: Image2, singleColorThreshold: number, color?: RGBA) {
     // Collect edge pixels
     let edgePixels: Pixel[] = [];
 
@@ -30,28 +43,19 @@ export default function removeSolidColor(image: Image2) {
         edgePixels.push(image.pixels[y * image.width + (image.width - 1)]); // Right
     }
 
-    // Count color occurrences
-    for (let pixel of edgePixels) {
-        let colorStr = rgbaToString(pixel.rgba);
-        colorCount.set(colorStr, (colorCount.get(colorStr) || 0) + 1);
-    }
-
-    // Find the most common edge color
-    let mostCommonColorStr = [...colorCount.entries()].reduce((a, b) => (a[1] > b[1] ? a : b))[0];
-    let mostCommonColor = stringToRgba(mostCommonColorStr);
-    console.log(mostCommonColor);
-
+    color = color ?? findColor(edgePixels);
     // Remove background pixels starting from the edges
-    let threshold = 0.2; // 20% threshold
     let queue: Pixel[] = [...edgePixels];
 
     while (queue.length > 0) {
         let pixel = queue.pop()!;
-        if (pixel.marked) continue; // Skip already processed pixels
+        if (pixel.marked) {
+            continue;
+        }
 
-        let diff = colorDifference(pixel.rgba, mostCommonColor);
-        if (diff < threshold) {
-            pixel.marked = true; // Remove pixel
+        let diff = colorDifference(pixel.rgba, color);
+        if (diff < singleColorThreshold) {
+            pixel.marked = true;
             pixel.rgba[3] = 0;
 
             const neighbors = image.getNeighbours([pixel.x, pixel.y]);

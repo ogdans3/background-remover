@@ -50,4 +50,10 @@ export default class Image2 {
         imageData.data.set(this.pixels.map((p) => p.rgba).flat(1));
         return new Image2(imageData);
     }
+
+    unmark() {
+        for (let pixel of this.pixels) {
+            pixel.marked = false;
+        }
+    }
 }

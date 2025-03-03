@@ -27,7 +27,7 @@
 	$effect(() => {
 		console.log(image);
 		if (image) {
-            //TODO: This is the wrong way to use effects apparently
+			//TODO: This is the wrong way to use effects apparently
 			untrack(() => setup());
 		}
 	});
@@ -37,7 +37,7 @@
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		context.drawImage(image, 0, 0, imageWidth, imageHeight);
 		image2 = new Image2(context.getImageData(0, 0, imageWidth, imageHeight));
-        onLoad();
+		onLoad();
 	}
 
 	export function update() {
